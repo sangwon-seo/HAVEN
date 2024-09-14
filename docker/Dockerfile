@@ -1,5 +1,6 @@
 FROM nvidia/cuda:9.2-cudnn7-devel-ubuntu16.04
-MAINTAINER Tabish Rashid
+# MAINTAINER Tabish Rashid    # deprecated
+LABEL org.opencontainers.image.authors="Tabish Rashid"
 
 # CUDA includes
 ENV CUDA_PATH /usr/local/cuda

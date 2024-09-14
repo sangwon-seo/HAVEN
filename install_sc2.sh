@@ -12,7 +12,7 @@ cd $EXP_DIR/pymarl
 mkdir 3rdparty
 cd 3rdparty
 
-export SC2PATH=`pwd`'/StarCraftII'
+export SC2PATH=`pwd`'/StarCraftII/4.6.2.69232'
 echo 'SC2PATH is set to '$SC2PATH
 
 if [ ! -d $SC2PATH ]; then
