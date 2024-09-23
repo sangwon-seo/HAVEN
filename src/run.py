@@ -37,12 +37,18 @@ def run(_run, _config, _log):
                                        width=1)
     _log.info("\n\n" + experiment_params + "\n")
 
+    # env name
+    env_name = args.env
+    map_name = args.env_args.get('map_name', None)
+    if map_name is not None:
+        env_name = env_name + "_" + map_name
+
     # configure tensorboard logger
     unique_token = "{}__{}".format(args.name, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     args.unique_token = unique_token
     if args.use_tensorboard:
         tb_logs_direc = os.path.join(dirname(dirname(abspath(__file__))), "results", "tb_logs")
-        tb_exp_direc = os.path.join(tb_logs_direc, "{}").format(unique_token)
+        tb_exp_direc = os.path.join(tb_logs_direc, env_name, "{}").format(unique_token)
         logger.setup_tb(tb_exp_direc)
 
     # sacred is on by default
@@ -120,8 +126,11 @@ def evaluate_sequential(args, runner, buffer, macro_buffer):
     # pickle.dump(buffer, f_buffer)
     #f_macro_buffer = open('{}/macro_buffer.pkl'.format(args.checkpoint_path), 'wb')
     #pickle.dump(macro_buffer, f_macro_buffer)
-    map_name = args.env_args['map_name']
-    f_trajs = open(f'{args.checkpoint_path}/{args.env}_{map_name}_{args.test_nepisode}.pkl', 'wb')
+    env_name = args.env
+    map_name = args.env_args.get('map_name', None)
+    if map_name is not None:
+        env_name = env_name + "_" + map_name
+    f_trajs = open(f'{args.checkpoint_path}/{env_name}_{args.test_nepisode}.pkl', 'wb')
     pickle.dump(expert_trajs, f_trajs)
     print(f'===== Successfully generated {args.test_nepisode} expert trajectories')
 
@@ -295,7 +304,12 @@ def run_sequential(args, logger):
 
         if args.save_model and (runner.t_env - model_save_time >= args.save_model_interval or model_save_time == 0):
             model_save_time = runner.t_env
-            save_path = os.path.join(args.local_results_path, "models", args.unique_token, str(runner.t_env))
+            # env name
+            env_name = args.env
+            map_name = args.env_args.get('map_name', None)
+            if map_name is not None:
+                env_name = env_name + "_" + map_name
+            save_path = os.path.join(args.local_results_path, "models", env_name, args.unique_token, str(runner.t_env))
             #"results/models/{}".format(unique_token)
             os.makedirs(save_path, exist_ok=True)
             logger.console_logger.info("Saving models to {}".format(save_path))
