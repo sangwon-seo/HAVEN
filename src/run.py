@@ -14,9 +14,10 @@ from sklearn.cluster import MiniBatchKMeans
 from learners import REGISTRY as le_REGISTRY
 from runners import REGISTRY as r_REGISTRY
 from controllers import REGISTRY as mac_REGISTRY
-from components.episode_buffer import ReplayBuffer
+from components.episode_buffer import ReplayBuffer, EpisodeBatch
 from components.transforms import OneHot
 import pickle
+from collections import defaultdict
 
 
 def run(_run, _config, _log):
@@ -66,16 +67,63 @@ def run(_run, _config, _log):
     os._exit(os.EX_OK)
 
 
+# sangwon: run env
 def evaluate_sequential(args, runner, buffer, macro_buffer):
-
+    def transpose_data(item):
+        n_agents = item.shape[1]
+        
+        list_individual_episodes = []
+        for idx in range(n_agents):
+            list_individual_episodes.append(item[:, idx, :])
+        
+        return list_individual_episodes
+            
+    # convert to my format
+    expert_trajs = defaultdict(list)
+    list_wons = []
+    list_episode = []
+    print(f'===== Generate {args.test_nepisode} expert trajectories')
     for _ in range(args.test_nepisode):
-        episode_batch, macro_episode_batch = runner.run(test_mode=True)
+        episode_batch, macro_episode_batch, battle_won = runner.run(test_mode=True)
         buffer.insert_episode_batch(episode_batch)
         macro_buffer.insert_episode_batch(macro_episode_batch)
-    f_buffer = open('{}/buffer.pkl'.format(args.checkpoint_path), 'wb')
-    pickle.dump(buffer, f_buffer)
+
+        list_wons.append(battle_won)
+        list_episode.append(episode_batch)
+        # 'obs': (1, 121, 5, 80)
+        # 'actions': (1, 121, 5, 1)
+        # 'avail_actions': (1, 121, 5, 11)
+        # 'reward': (1, 121, 1)
+        # 'terminated': (1, 121, 1)
+        # 'subgoals': (1, 121, 5, 1)
+        expert_data = episode_batch.data.transition_data
+        expert_obs = expert_data['obs'].detach().cpu().numpy()
+        expert_avail_actions = expert_data['avail_actions'].detach().cpu().numpy()
+        expert_actions = expert_data['actions'].detach().cpu().numpy()
+        expert_rewards = expert_data['reward'].detach().cpu().numpy()
+        expert_terminated = expert_data['terminated'].detach().cpu().numpy()
+        expert_subgoals = expert_data['subgoals'].detach().cpu().numpy()
+        n_agents = expert_data['obs'].shape[2]
+
+        expert_trajs["states"].append(transpose_data(expert_obs[0, :-1, :, :]))
+        expert_trajs["avail_actions"].append(transpose_data(expert_avail_actions[0, :-1, :, :]))
+        expert_trajs["next_states"].append(transpose_data(expert_obs[0, 1:, :, :]))
+        expert_trajs["actions"].append(transpose_data(expert_actions[0, :-1, :, :]))
+        expert_trajs["rewards"].append([expert_rewards[0, :-1, :] for _ in range(n_agents)])
+        expert_trajs["dones"].append([expert_terminated[0, :-1, :] for _ in range(n_agents)])
+        expert_trajs["latents"].append(transpose_data(expert_subgoals[0, :-1, :, :]))
+        expert_trajs["wons"].append(battle_won)
+        expert_trajs["lengths"].append(expert_data['obs'].shape[1] - 1)
+    
+
+    # f_buffer = open('{}/buffer.pkl'.format(args.checkpoint_path), 'wb')
+    # pickle.dump(buffer, f_buffer)
     #f_macro_buffer = open('{}/macro_buffer.pkl'.format(args.checkpoint_path), 'wb')
     #pickle.dump(macro_buffer, f_macro_buffer)
+    map_name = args.env_args['map_name']
+    f_trajs = open(f'{args.checkpoint_path}/{args.env}_{map_name}_{args.test_nepisode}.pkl', 'wb')
+    pickle.dump(expert_trajs, f_trajs)
+    print(f'===== Successfully generated {args.test_nepisode} expert trajectories')
 
     if args.save_replay:
         runner.save_replay()
@@ -84,6 +132,7 @@ def evaluate_sequential(args, runner, buffer, macro_buffer):
 
 def run_sequential(args, logger):
 
+    # sangwon: starcraft - runners.episode_runner.EpisodeRunner 
     # Init runner so we can get env info
     runner = r_REGISTRY[args.runner](args=args, logger=logger)
 
@@ -172,7 +221,7 @@ def run_sequential(args, logger):
         model_path = os.path.join(args.checkpoint_path, str(timestep_to_load))
 
         logger.console_logger.info("Loading model from {}".format(model_path))
-        learner.load_models(model_path)
+        learner.load_models(model_path)  # sangwon: load models
         runner.t_env = timestep_to_load
 
         if args.evaluate or args.save_replay:
@@ -193,7 +242,7 @@ def run_sequential(args, logger):
     while runner.t_env <= args.t_max:
 
         # Run for a whole episode at a time
-        episode_batch, macro_episode_batch = runner.run(test_mode=False)
+        episode_batch, macro_episode_batch, won = runner.run(test_mode=False)
         buffer.insert_episode_batch(episode_batch)
         macro_buffer.insert_episode_batch(macro_episode_batch)
 

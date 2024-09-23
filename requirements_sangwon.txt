@@ -1,0 +1,6 @@
+sacred
+PyYAML
+torch
+scikit-learn
+six
+tensorboard_logger

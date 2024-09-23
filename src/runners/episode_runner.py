@@ -113,7 +113,7 @@ class EpisodeRunner:
             self.batch.update(post_transition_data, ts=self.t)
 
             self.t += 1
-
+        battle_won = env_info.get("battle_won", None)
         post_macro_transition_data = {
             "macro_actions": macro_actions,
             "macro_reward": [(macro_reward,)],
@@ -165,7 +165,7 @@ class EpisodeRunner:
                 self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
             self.log_train_stats_t = self.t_env
 
-        return self.batch, self.macro_batch
+        return self.batch, self.macro_batch, battle_won
 
     def _log(self, returns, stats, prefix):
         self.logger.log_stat(prefix + "return_mean", np.mean(returns), self.t_env)

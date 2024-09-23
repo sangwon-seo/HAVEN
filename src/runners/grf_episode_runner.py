@@ -177,6 +177,7 @@ class EpisodeRunner:
         if not test_mode:
             self.t_env += self.t
 
+        game_won = win_tag > 0
         cur_returns.append(episode_return)
         if test_mode:
             self.test_wins.append(win_tag)
@@ -194,7 +195,7 @@ class EpisodeRunner:
                 self.logger.log_stat(
                     "epsilon", self.mac.action_selector.epsilon, self.t_env)
             self.log_train_stats_t = self.t_env
-        return self.batch, self.macro_batch
+        return self.batch, self.macro_batch, game_won
 
     def _log(self, returns, stats, prefix):
         self.logger.log_stat(prefix + "return_mean", np.mean(returns), self.t_env)
