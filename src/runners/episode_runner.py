@@ -54,7 +54,7 @@ class EpisodeRunner:
         self.env.reset()
         self.t = 0
 
-    def run(self, test_mode=False):
+    def run(self, test_mode=False, deterministic_macro=False, deterministic_action=False):
         self.reset()
 
         terminated = False
@@ -93,12 +93,12 @@ class EpisodeRunner:
                 macro_reward = 0
                 self.macro_batch.update(post_macro_transition_data, ts=self.t//self.args.k-1)
             if self.t % self.args.k == 0:
-                macro_actions = self.macro_mac.select_actions(self.macro_batch, t_ep=self.t//self.args.k, t_env=self.t_env, test_mode=test_mode)
+                macro_actions = self.macro_mac.select_actions(self.macro_batch, t_ep=self.t//self.args.k, t_env=self.t_env, test_mode=deterministic_macro)
             pre_transition_data = {
                 "subgoals": macro_actions,
             }
             self.batch.update(pre_transition_data, ts=self.t)
-            actions = self.mac.select_actions(self.batch, t_ep=self.t, t_env=self.t_env, test_mode=test_mode)
+            actions = self.mac.select_actions(self.batch, t_ep=self.t, t_env=self.t_env, test_mode=deterministic_action)
 
             reward, terminated, env_info = self.env.step(actions[0])
             episode_return += reward
@@ -136,12 +136,12 @@ class EpisodeRunner:
         self.macro_batch.update(last_macro_data, ts=macro_index+1)
 
         # Select actions in the last stored state
-        macro_actions = self.macro_mac.select_actions(self.macro_batch, t_ep=macro_index+1, t_env=self.t_env, test_mode=test_mode)
+        macro_actions = self.macro_mac.select_actions(self.macro_batch, t_ep=macro_index+1, t_env=self.t_env, test_mode=deterministic_macro)
         pre_transition_data = {
             "subgoals": macro_actions,
         }
         self.batch.update(pre_transition_data, ts=self.t)
-        actions = self.mac.select_actions(self.batch, t_ep=self.t, t_env=self.t_env, test_mode=test_mode)
+        actions = self.mac.select_actions(self.batch, t_ep=self.t, t_env=self.t_env, test_mode=deterministic_action)
         self.macro_batch.update({"macro_actions": macro_actions}, ts=macro_index+1)
         self.batch.update({"actions": actions}, ts=self.t)
 
